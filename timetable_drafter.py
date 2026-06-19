@@ -1,7 +1,7 @@
 # ==========================================
 # Timetable Drafter 
-# Version: 1.1.1
-# Citation: Pundir, V. (2026, June 13). Timetable Drafter Version (1.1.1). Retrieved from https://github.com/accidentalscholar/timetable-drafter.
+# Version: 1.2.0
+# Citation: Pundir, V. (2026, June 19). Timetable Drafter Version (1.2.0). Retrieved from https://github.com/accidentalscholar/timetable-drafter.
 # Citation: RIS and BibTeX files included for referencing software.
 # Tested in: Python 3.12.11 64 bit packaged by Anaconda, Inc.
 # Reporsitory: https://github.com/accidentalscholar/timetable-drafter
@@ -77,11 +77,13 @@ def compute_lcm_list(lst):
     if not lst: return 1
     return reduce(compute_lcm, lst, 1)
 
-# Helper function to brutally sanitize all Excel inputs to prevent hidden whitespace bugs
+# Helper function to brutally sanitize all Excel inputs to prevent hidden whitespace & NaN bugs
 def sanitize_df(df):
     if df is not None:
         for col in df.select_dtypes(['object']).columns:
             df[col] = df[col].astype(str).str.strip()
+            # Destroy the phantom "nan" string created by Pandas when casting empty cells
+            df[col] = df[col].replace({'nan': '', 'None': '', 'null': ''})
     return df
 
 # ==========================================
@@ -148,6 +150,8 @@ if not term_columns:
     print("\n[!] FORMAT ERROR (Programmes): Missing 'Cohort' column.")
     sys.exit(1)
 
+ordered_terms = [col.replace('Cohort', '') for col in term_columns]
+
 print("[+] Pre-Flight Check Passed! Data is clean.", flush=True)
 
 # ==========================================
@@ -158,14 +162,33 @@ df_staff.set_index("Initials", inplace=True)
 df_rooms.set_index("RoomType", inplace=True)
 df_modules.set_index("ModuleCode", inplace=True)
 
+# Robust Staff Availability Parsing (with Term logic)
 try:
-    df_staff_avail = sanitize_df(pd.read_excel(xls, sheet_name="Staff_Availability").dropna(how='all'))
-    permitted_staff = set(zip(df_staff_avail['StaffInitials'], df_staff_avail['Day'] + "_" + df_staff_avail['TimeSlot']))
+    df_staff_avail = pd.read_excel(xls, sheet_name="Staff_Availability")
+    df_staff_avail = sanitize_df(df_staff_avail)
+    df_staff_avail.dropna(subset=['StaffInitials'], inplace=True)
+    
     restricted_staff_set = set(df_staff_avail['StaffInitials'])
-except:
+    permitted_staff = set()
+    
+    if 'Term' not in df_staff_avail.columns:
+        df_staff_avail['Term'] = ''
+        
+    for _, row in df_staff_avail.iterrows():
+        st = row['StaffInitials']
+        t_str = f"{row['Day']}_{row['TimeSlot']}"
+        term_val = str(row.get('Term', '')).strip()
+        
+        if not term_val or term_val.lower() in ['all', 'none']:
+            for tm in ordered_terms:
+                permitted_staff.add((st, tm, t_str))
+        else:
+            permitted_staff.add((st, term_val, t_str))
+except Exception as e:
     permitted_staff = set()
     restricted_staff_set = set()
     
+# Programme Availability Parsing
 try:
     df_prog_avail = sanitize_df(pd.read_excel(xls, sheet_name="Programme_Availability").dropna(how='all'))
     permitted_progs = set(zip(df_prog_avail['ProgrammeCode'], df_prog_avail['Day']))
@@ -189,8 +212,10 @@ except:
     MAX_CLASSES_PER_DAY = 3
     MAX_STAFF_CLASSES_PER_DAY = 4
 
-if 'Term' not in df_mod_staff.columns: df_mod_staff['Term'] = "All"
-df_mod_staff['Term'] = df_mod_staff['Term'].fillna("All")
+# Map explicit blanks back to "All" for Module Staff assignments
+if 'Term' not in df_mod_staff.columns: 
+    df_mod_staff['Term'] = "All"
+df_mod_staff['Term'] = df_mod_staff['Term'].replace({'': 'All'})
 
 if 'NumberOfRooms' not in df_rooms.columns: df_rooms['NumberOfRooms'] = 0
 df_rooms['NumberOfRooms'] = pd.to_numeric(df_rooms['NumberOfRooms'], errors='coerce').fillna(0)
@@ -203,7 +228,6 @@ for idx, row in df_timeslots.iterrows():
     
 all_staff = df_mod_staff['StaffInitials'].unique().tolist()
 all_progs = df_mod_prog['ProgrammeCode'].unique().tolist()
-ordered_terms = [col.replace('Cohort', '') for col in term_columns]
 
 # ==========================================
 # 4. GLOBAL GROUP SIZING & BASE DEPENDENCIES
@@ -313,7 +337,6 @@ for (mod_code, term), group in df_mod_prog.groupby(['ModuleCode', 'Term']):
 
 module_term_info.sort(key=lambda x: x['num_sections'], reverse=True)
 
-# Generate a global alphabetical index for Orthogonal Dealing
 global_group_idx = {}
 sorted_all_groups = sorted(list(all_groups))
 for idx, g_name in enumerate(sorted_all_groups):
@@ -327,7 +350,7 @@ term_data = {term: {t: {d: [] for d in days_list} for t in ordered_timeslots} fo
 staff_data = {}
 group_data = {}
 module_data = {} 
-programme_data = {} # NEW: Dict for Programme Sheets
+programme_data = {} 
 
 for current_term in ordered_terms:
     try:
@@ -347,7 +370,7 @@ for current_term in ordered_terms:
             print(f"    - {info['mod_code']}: {info['num_sections']} sections  ->  Gravity Penalty: {gravity_weight:,}", flush=True)
         
         # ----------------------------------------------------
-        # A. Strict Contiguous Clump Packing (Shattering the Spiderweb)
+        # A. Strict Contiguous Clump Packing
         # ----------------------------------------------------
         S = []
         module_of_section = {}
@@ -367,7 +390,6 @@ for current_term in ordered_terms:
             if not module_groups or num_sections == 0:
                 continue
 
-            # Strict Alphabetical Slicing to guarantee identical blocks minimize cross-overlaps
             module_groups.sort(key=lambda x: x['name'])
             
             section_names = [f"{mod_code}-{current_term}-{chr(65+i)}" for i in range(num_sections)]
@@ -378,7 +400,6 @@ for current_term in ordered_terms:
             base_count = num_groups // num_sections if num_sections > 0 else 0
             remainder = num_groups % num_sections if num_sections > 0 else 0
             
-            # Deal the groups into solid, unmoving contiguous chunks
             group_idx = 0
             for i, s_name in enumerate(section_names):
                 count_for_this_sec = base_count + (1 if i < remainder else 0)
@@ -397,11 +418,17 @@ for current_term in ordered_terms:
             split_quotas = {}
             if num_sections > 1 and not staff_split_df.empty:
                 allocated = 0
+                fallback_pct = 100.0 / len(staff_split_df)
                 for _, row in staff_split_df.iterrows():
                     st = row['StaffInitials']
-                    q = int(round(num_sections * (pd.to_numeric(row['SplitPercentage'], errors='coerce') / 100.0)))
+                    percent = pd.to_numeric(row['SplitPercentage'], errors='coerce')
+                    if pd.isna(percent):
+                        percent = fallback_pct
+                    q = int(round(num_sections * (percent / 100.0)))
                     split_quotas[st] = q
                     allocated += q
+                
+                # Assign remainder safely to the first staff member if math is imperfect
                 diff = num_sections - allocated
                 if diff != 0:
                     first_staff = staff_split_df.iloc[0]['StaffInitials']
@@ -418,7 +445,6 @@ for current_term in ordered_terms:
                 required_cap = max(base_capacity, actual_packed_size)
                 valid_rooms = [r for r in df_rooms.index if df_rooms.loc[r, "Capacity"] >= required_cap]
                 
-                # Room Capacity Fallback: Prevent Mathematical Void
                 if not valid_rooms:
                     largest_room = df_rooms['Capacity'].idxmax()
                     valid_rooms = [largest_room]
@@ -506,7 +532,7 @@ for current_term in ordered_terms:
                 d = t.split('_')[0]
                 blocked = False
                 for staff in staff_of_section[s]:
-                    if staff in restricted_staff_set and (staff, t) not in permitted_staff: 
+                    if staff in restricted_staff_set and (staff, current_term, t) not in permitted_staff: 
                         blocked = True
                 for p in prog_of_section[s]:
                     if p in restricted_prog_set and (p, d) not in permitted_progs: 
@@ -591,7 +617,6 @@ for current_term in ordered_terms:
                             
                             term_data[current_term][time_part][day_part].append(class_info)
                             
-                            # Collect Programme-Level Data
                             for p in prog_of_section[s]:
                                 if p not in programme_data:
                                     programme_data[p] = {tm: {tt: {dd: [] for dd in days_list} for tt in ordered_timeslots} for tm in ordered_terms}

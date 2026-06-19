@@ -90,7 +90,7 @@ The script looks at programme cohort sizes to understand how class sizes for mod
 > ##### Rooms
 > 
 > The sheet is called _Rooms_, but the script does not deal with individual rooms. Rather, this sheet should list the different types of rooms.
-> | RoomType | Capacity | NumberOfRooms | Overflow |
+> | RoomType | Capacity | NumberOfRooms | RoomOverflow |
 > | --- | --- | --- | --- |
 > | Type of room, e.g. _Seminar_. | The number of students the room can accommodate. | The number of rooms of this type. This is _optional_ - if left blank, the script will assume plenty of rooms of this type are available. | This is _optional_ - This is intended to build a certain "give" into the room capacity, e.g., if a room's capacity is 30, and the cohort has 31 students, then instead of creating two sections, we may want to subsume the 31st student into the section even though technically the capacity is only 30. This column should contain the amount by which we can expand room capacity _if needed_, e.g., if a 30-student classroom can handle 35, if needed, then this column should say 5. If no value is provided, _zero_ is assumed, i.e., room capacity has no "give". |
 > 

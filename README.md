@@ -20,7 +20,7 @@ This script:
 
 ## The Problem
 
-Timetabling is a standard *operations research* problem, usually addressed with the mathematical technique of *linear programming* or *LP* for short. However, most administrators charged with doing timetabling aren't familiar with *LP* and often have to devote large amounts of time and effort on the exercise, which grows exponentially with the number of parameters (programmes, modules, staff members, etc).
+Timetabling is a standard *[operations research](https://en.wikipedia.org/wiki/Operations_research)* / *operational research* (*OR*) problem, usually addressed with the mathematical technique of *[linear programming](https://en.wikipedia.org/wiki/Linear_programming)* (*LP*). However, most administrators charged with doing timetabling aren't familiar with *LP* and often have to devote large amounts of time and effort on the exercise, which grows exponentially with the number of parameters (programmes, modules, staff members, etc).
 
 This script intends to provide some relief as it undertakes the *LP* and other nifty *operations research* techniques such as Soft Constraints, Orthogonal Bin Packing, Block Rotation, Strict Contiguous Clumping, etc., in the background.
 
@@ -148,22 +148,20 @@ The script looks at programme cohort sizes to understand how class sizes for mod
 
 ### Running the script
 
-When you run the Python script, it will pop up a file explorer/finder window asking you to select the setup *Excel* file.
+When you run the *Python* script, it will pop up a file explorer/finder window asking you to select the setup *Excel* file.
 
-Once you have done that, it will work through the setup and constraints, develop a timetable, and save the output to an Excel file in the same folder.
+Once you have done that, it will work through the setup and constraints, develop a timetable, and save the output to an *Excel* file in the same folder.
 
 ### Output
 
 The script will save the output as an *Excel* file in the same folder as the setup file.
 
-The Excel workbook will have a sheet per Word DOCX file and a summary sheet providing an overview for the folder.
-
-
+The *Excel* workbook will have a sheet per *Word DOCX* file and a summary sheet providing an overview for the folder.
 
 ### Note
 
 1. The script uses some standard *Python* libraries. If you don't have them installed on your system, then in the first run, the script will try to install these dependencies. If the script can't install these dependencies, for instance if your PC environment precludes it, then it will usually give you the console commands you can use to install these.
-2. If some of your libraries and executables sit outside the *Path*, such as if you don't have Admin rights to your work laptop, then you should include the folder addresses in the 'path.txt' file, which should sit in the same folder as the '*timetable-drafter.py*' file, e.g. '*C:\Users\Username\AppData\Roaming\Python\Python313\Scripts*' and '*C:\Users\Username\AppData\Roaming\Python\Python313\site-packages*'.
+2. If some of your libraries and executables sit outside the *Path*, such as if you don't have Admin rights to your work laptop, then you should include the folder addresses in the '*path.txt*' file, which should sit in the same folder as the '*timetable-drafter.py*' file, e.g. '*C:\Users\Username\AppData\Roaming\Python\Python313\Scripts*' and '*C:\Users\Username\AppData\Roaming\Python\Python313\site-packages*'.
 
 ## Caveat
 
